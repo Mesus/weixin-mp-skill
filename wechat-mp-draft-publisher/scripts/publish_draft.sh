@@ -8,6 +8,7 @@ BIN="${MP_WECHAT_CLI_BIN:-$BIN_DEFAULT}"
 GITHUB_REPO="${MP_WECHAT_GITHUB_REPO:-}"
 RELEASE_TAG="${MP_WECHAT_RELEASE_TAG:-latest}"
 ASSET_NAME="${MP_WECHAT_ASSET_NAME:-}"
+RELEASE_URL="${MP_WECHAT_RELEASE_URL:-}"
 ARTICLE_IMAGE=""
 COVER_IMAGE=""
 CONTENT_FILE=""
@@ -30,6 +31,7 @@ Options:
   --repo             GitHub repo owner/repo for auto-download (or env MP_WECHAT_GITHUB_REPO)
   --tag              GitHub release tag (default: latest, or env MP_WECHAT_RELEASE_TAG)
   --asset            Release asset name override (or env MP_WECHAT_ASSET_NAME)
+  --url              Direct release asset URL (or env MP_WECHAT_RELEASE_URL)
   --article-image    Optional local article image path
   --cover-image      Local cover image path
   --content-file     Local article content file path
@@ -77,8 +79,8 @@ ensure_bin() {
     return
   fi
 
-  if [ -z "$GITHUB_REPO" ]; then
-    err_json "executable not found: $BIN ; set --bin or configure --repo/MP_WECHAT_GITHUB_REPO for auto-download"
+  if [ -z "$GITHUB_REPO" ] && [ -z "$RELEASE_URL" ]; then
+    err_json "executable not found: $BIN ; set --bin or configure --url/MP_WECHAT_RELEASE_URL or --repo/MP_WECHAT_GITHUB_REPO"
     exit 1
   fi
 
@@ -88,12 +90,17 @@ ensure_bin() {
     exit 1
   fi
 
-  local cmd=(bash "$installer" --repo "$GITHUB_REPO" --tag "$RELEASE_TAG" --out "$BIN")
-  if [ -n "$ASSET_NAME" ]; then
-    cmd+=(--asset "$ASSET_NAME")
+  local cmd=(bash "$installer" --out "$BIN")
+  if [ -n "$RELEASE_URL" ]; then
+    cmd+=(--url "$RELEASE_URL")
+  else
+    cmd+=(--repo "$GITHUB_REPO" --tag "$RELEASE_TAG")
+    if [ -n "$ASSET_NAME" ]; then
+      cmd+=(--asset "$ASSET_NAME")
+    fi
   fi
   if ! "${cmd[@]}" >/dev/null 2>&1; then
-    err_json "failed to download executable from GitHub release; repo=$GITHUB_REPO tag=$RELEASE_TAG"
+    err_json "failed to download executable from release"
     exit 1
   fi
 
@@ -123,6 +130,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --asset)
       ASSET_NAME="$2"
+      shift 2
+      ;;
+    --url)
+      RELEASE_URL="$2"
       shift 2
       ;;
     --cover-image)

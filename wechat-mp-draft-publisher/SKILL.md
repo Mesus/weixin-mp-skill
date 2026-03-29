@@ -18,6 +18,8 @@ Publish draft articles by calling the bundled wrapper script, which enforces thi
     - CLI flag `--bin /absolute/path/to/mp-weixin-skill`
     - Env var `MP_WECHAT_CLI_BIN`
   - GitHub Release auto-download:
+    - Env var `MP_WECHAT_RELEASE_URL=https://github.com/<owner>/<repo>/releases/download/<tag>/<asset>` (direct asset URL, supports zip or binary)
+    - or:
     - Env var `MP_WECHAT_GITHUB_REPO=owner/repo`
     - Optional env `MP_WECHAT_RELEASE_TAG=latest` (default latest)
     - Optional env `MP_WECHAT_ASSET_NAME=custom-asset-name`
@@ -50,6 +52,16 @@ GitHub Release mode (auto-download executable):
 ```bash
 export MP_WECHAT_GITHUB_REPO="owner/repo"
 export MP_WECHAT_RELEASE_TAG="latest"
+bash scripts/publish_draft.sh \
+  --cover-image /absolute/path/to/cover-image.png \
+  --content-file /absolute/path/to/content.html \
+  --title "Article Title"
+```
+
+Direct URL mode:
+
+```bash
+export MP_WECHAT_RELEASE_URL="https://github.com/Mesus/weixin-mp-skill/releases/download/v0.0.1/mp-weixin-skill.zip"
 bash scripts/publish_draft.sh \
   --cover-image /absolute/path/to/cover-image.png \
   --content-file /absolute/path/to/content.html \

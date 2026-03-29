@@ -5,14 +5,16 @@ REPO=""
 TAG="latest"
 ASSET_NAME=""
 OUT=""
+URL=""
 
 usage() {
   cat <<'EOF'
 Usage:
-  install_mp_weixin_skill.sh --repo owner/repo [--tag latest|vX.Y.Z] [--asset asset-name] [--out /path/to/mp-weixin-skill]
+  install_mp_weixin_skill.sh (--url https://... | --repo owner/repo) [--tag latest|vX.Y.Z] [--asset asset-name] [--out /path/to/mp-weixin-skill]
 
 Options:
-  --repo    GitHub repository in owner/repo format (required)
+  --url     Direct download URL for release asset (zip or binary)
+  --repo    GitHub repository in owner/repo format
   --tag     Release tag, default latest
   --asset   Release asset name; if omitted, auto-detect by platform
   --out     Output binary path; default: <skill>/bin/mp-weixin-skill
@@ -24,6 +26,8 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --repo)
       REPO="$2"; shift 2 ;;
+    --url)
+      URL="$2"; shift 2 ;;
     --tag)
       TAG="$2"; shift 2 ;;
     --asset)
@@ -39,8 +43,8 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-if [ -z "$REPO" ]; then
-  echo "--repo is required" >&2
+if [ -z "$REPO" ] && [ -z "$URL" ]; then
+  echo "Either --url or --repo is required" >&2
   usage
   exit 1
 fi
@@ -66,19 +70,25 @@ if [ -z "$ASSET_NAME" ]; then
   fi
 fi
 
-if [ "$TAG" = "latest" ]; then
-  api_url="https://api.github.com/repos/${REPO}/releases/latest"
-else
-  api_url="https://api.github.com/repos/${REPO}/releases/tags/${TAG}"
-fi
-
 auth_header=()
 if [ -n "${GITHUB_TOKEN:-}" ]; then
   auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
 fi
 
-release_json="$(curl -fsSL "${auth_header[@]}" -H "Accept: application/vnd.github+json" "$api_url")"
-asset_url="$(
+asset_url="$URL"
+if [ -z "$asset_url" ]; then
+  if [ "$TAG" = "latest" ]; then
+    api_url="https://api.github.com/repos/${REPO}/releases/latest"
+  else
+    api_url="https://api.github.com/repos/${REPO}/releases/tags/${TAG}"
+  fi
+
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    release_json="$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "$api_url")"
+  else
+    release_json="$(curl -fsSL -H "Accept: application/vnd.github+json" "$api_url")"
+  fi
+  asset_url="$(
   printf '%s' "$release_json" | python3 - "$ASSET_NAME" <<'PY'
 import json, sys
 asset_name = sys.argv[1]
@@ -95,6 +105,7 @@ if contains:
 print("")
 PY
 )"
+fi
 
 if [ -z "$asset_url" ]; then
   echo "Asset not found in release." >&2
@@ -103,8 +114,44 @@ if [ -z "$asset_url" ]; then
 fi
 
 tmp_file="${OUT}.download"
-curl -fsSL "${auth_header[@]}" -H "Accept: application/octet-stream" -o "$tmp_file" "$asset_url"
-chmod +x "$tmp_file"
-mv "$tmp_file" "$OUT"
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+  curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/octet-stream" -o "$tmp_file" "$asset_url"
+else
+  curl -fsSL -H "Accept: application/octet-stream" -o "$tmp_file" "$asset_url"
+fi
+
+is_zip=0
+if [ "${asset_url##*.}" = "zip" ]; then
+  is_zip=1
+fi
+if [ "$is_zip" -eq 0 ] && command -v file >/dev/null 2>&1; then
+  if file "$tmp_file" | grep -qi 'zip archive'; then
+    is_zip=1
+  fi
+fi
+
+if [ "$is_zip" -eq 1 ]; then
+  if ! command -v unzip >/dev/null 2>&1; then
+    echo "unzip is required to extract zip asset" >&2
+    exit 1
+  fi
+  extract_dir="$(mktemp -d)"
+  unzip -o "$tmp_file" -d "$extract_dir" >/dev/null
+  candidate="$extract_dir/mp-weixin-skill"
+  if [ ! -f "$candidate" ]; then
+    candidate="$(find "$extract_dir" -type f -name 'mp-weixin-skill*' | head -n1 || true)"
+  fi
+  if [ -z "${candidate:-}" ] || [ ! -f "$candidate" ]; then
+    echo "cannot find mp-weixin-skill in zip asset" >&2
+    rm -rf "$extract_dir"
+    exit 1
+  fi
+  chmod +x "$candidate"
+  mv "$candidate" "$OUT"
+  rm -rf "$extract_dir" "$tmp_file"
+else
+  chmod +x "$tmp_file"
+  mv "$tmp_file" "$OUT"
+fi
 
 echo "Installed mp-weixin-skill to: $OUT"

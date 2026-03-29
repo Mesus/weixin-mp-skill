@@ -22,6 +22,7 @@ Wrapper script: `scripts/publish_draft.sh`
 - `--repo`: GitHub repo `owner/repo` for auto-download (or env `MP_WECHAT_GITHUB_REPO`)
 - `--tag`: release tag (or env `MP_WECHAT_RELEASE_TAG`, default `latest`)
 - `--asset`: release asset name override (or env `MP_WECHAT_ASSET_NAME`)
+- `--url`: direct release asset URL (or env `MP_WECHAT_RELEASE_URL`, supports zip or binary)
 - `--article-image`: local image path for article image upload
 - `--cover-image`: local image path for cover upload
 - `--content-file`: local article content file path
@@ -55,3 +56,7 @@ If local binary is missing and `--repo` or `MP_WECHAT_GITHUB_REPO` is provided, 
 and installs executable to:
 
 - `<skill>/bin/mp-weixin-skill`
+
+It can download from:
+- direct URL (`--url` / `MP_WECHAT_RELEASE_URL`)
+- GitHub release API (`--repo` + optional `--tag/--asset`)
