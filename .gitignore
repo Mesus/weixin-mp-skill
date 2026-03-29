@@ -1,0 +1,10 @@
+# IDE
+.idea/
+.DS_Store
+.vscode/
+.venv
+.env
+mp-weixin-skill
+ssl
+__MACOSX
+__pycache__
